@@ -1,0 +1,11 @@
+/target
+
+# Recorded data. Never commit it: window titles are personal.
+/logs
+*.jsonl
+current.json
+fuashiato-error.log
+
+# Local notes and tooling
+/fuashiato-spec.md
+/.claude

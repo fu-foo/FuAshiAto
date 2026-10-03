@@ -1,0 +1,71 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # The version lives in Cargo.toml and in the EXE's version resource.
+      # A tag that disagrees with either would ship a mislabelled binary.
+      - name: Check the tag matches the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          cargo_ver=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          rc_ver=$(grep -m1 '"ProductVersion"' res/fuashiato.rc | cut -d'"' -f4)
+          echo "tag=$tag Cargo.toml=$cargo_ver fuashiato.rc=$rc_ver"
+          [ "$tag" = "$cargo_ver" ] && [ "$tag" = "$rc_ver" ]
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Build
+        run: cargo build --release --locked
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuashiato-x64
+          if-no-files-found: error
+          path: target/release/fuashiato.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cp artifacts/fuashiato-x64/fuashiato.exe release/fuashiato-x64.exe
+          cd release
+          sha256sum fuashiato-x64.exe > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          files: release/*
+          generate_release_notes: true
