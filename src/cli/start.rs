@@ -43,13 +43,13 @@ fn spawn_detached(exe: &str, flags: u32) -> Result<u32, u32> {
 
 pub fn start() -> i32 {
     if let Some((_, pid)) = find_daemon() {
-        console::out(&format!("既に常駐しています（PID {pid}）"));
+        console::out(&format!("Already running (PID {pid})"));
         return 2;
     }
     let exe = match std::env::current_exe() {
         Ok(p) => p.to_string_lossy().into_owned(),
         Err(e) => {
-            console::err(&format!("実行ファイルのパスを取得できませんでした: {e}"));
+            console::err(&format!("Could not get the path of the executable: {e}"));
             return 10;
         }
     };
@@ -62,18 +62,18 @@ pub fn start() -> i32 {
         Ok(pid) => pid,
         Err(code) => {
             errlog::log(&format!("CreateProcessW failed (GetLastError={code})"));
-            console::err(&format!("常駐プロセスを起動できませんでした（エラー {code}）"));
+            console::err(&format!("Could not start the recorder (error {code})"));
             return 10;
         }
     };
 
     if wait_until(5_000, || find_daemon().is_some()) {
         let pid = find_daemon().map(|(_, p)| p).unwrap_or(child_pid);
-        console::out(&format!("常駐を開始しました（PID {pid}）"));
+        console::out(&format!("Started (PID {pid})"));
         0
     } else {
         console::err(&format!(
-            "常駐プロセスの起動を確認できませんでした。{} を確認してください",
+            "Could not confirm that the recorder started. See {}",
             paths::log_dir().join(paths::ERROR_LOG).display()
         ));
         10

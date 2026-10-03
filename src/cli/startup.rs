@@ -107,7 +107,7 @@ fn create_link(link: &PathBuf, target: &PathBuf, args: &str) -> Result<(), Strin
             let target_w = wide(&target.to_string_lossy());
             let workdir_w = wide(&target.parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default());
             let args_w = wide(args);
-            let desc_w = wide("fuashiato: 作業の記録を開始");
+            let desc_w = wide("FuAshiAto: start recording");
             let r = (|| {
                 check((v.set_path)(sl, target_w.as_ptr()), "SetPath")?;
                 check((v.set_arguments)(sl, args_w.as_ptr()), "SetArguments")?;
@@ -134,7 +134,7 @@ pub fn startup(arg: Option<&str>, explicit_dir: Option<&std::path::Path>) -> i32
     let dir = match startup_dir() {
         Ok(d) => d,
         Err(e) => {
-            console::err(&format!("スタートアップフォルダを取得できませんでした: {e}"));
+            console::err(&format!("Could not find the Startup folder: {e}"));
             return 10;
         }
     };
@@ -144,7 +144,7 @@ pub fn startup(arg: Option<&str>, explicit_dir: Option<&std::path::Path>) -> i32
             let exe = match std::env::current_exe() {
                 Ok(p) => p,
                 Err(e) => {
-                    console::err(&format!("実行ファイルのパスを取得できませんでした: {e}"));
+                    console::err(&format!("Could not get the path of the executable: {e}"));
                     return 10;
                 }
             };
@@ -155,34 +155,34 @@ pub fn startup(arg: Option<&str>, explicit_dir: Option<&std::path::Path>) -> i32
             };
             match create_link(&link, &exe, &args) {
                 Ok(()) => {
-                    console::out(&format!("スタートアップに登録しました: {}", link.display()));
-                    console::out(&format!("  実行内容: {} {args}", exe.display()));
+                    console::out(&format!("Added to Startup: {}", link.display()));
+                    console::out(&format!("  Runs: {} {args}", exe.display()));
                     0
                 }
                 Err(e) => {
-                    console::err(&format!("ショートカットを作成できませんでした: {e}"));
+                    console::err(&format!("Could not create the shortcut: {e}"));
                     10
                 }
             }
         }
         Some("off") => {
             if !link.exists() {
-                console::out("スタートアップには登録されていません");
+                console::out("Not in Startup");
                 return 0;
             }
             match std::fs::remove_file(&link) {
                 Ok(()) => {
-                    console::out(&format!("スタートアップから削除しました: {}", link.display()));
+                    console::out(&format!("Removed from Startup: {}", link.display()));
                     0
                 }
                 Err(e) => {
-                    console::err(&format!("ショートカットを削除できませんでした: {e}"));
+                    console::err(&format!("Could not delete the shortcut: {e}"));
                     10
                 }
             }
         }
         _ => {
-            console::err("使い方: fuashiato startup on|off");
+            console::err("Usage: fuashiato startup on|off");
             3
         }
     }

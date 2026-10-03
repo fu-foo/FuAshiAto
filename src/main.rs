@@ -11,23 +11,23 @@ use std::path::{Path, PathBuf};
 use common::console;
 
 const USAGE: &str = "\
-FuAshiAto - 作業の足跡を記録する
+FuAshiAto - records the footprints of your own work
 
-使い方: fuashiato <コマンド> [--dir <出力先フォルダ>]
+Usage: fuashiato <command> [--dir <log folder>]
 
-  run               前面で記録を実行（開発・検証用。記録内容を標準出力にも出す）
-  start             常駐を開始
-  stop              常駐を停止
-  status [--brief]  記録状態と今日のアクティブ時間を表示
-  pause [時間]      一時停止（例：30m、2h。省略時は無期限）
-  resume            再開
-  today             今日のプロセス別アクティブ時間
-  startup on|off    スタートアップへの登録・解除
-  open              ログフォルダを開く
-  version           バージョン表示
+  run               Record in the foreground and echo records to stdout (for testing)
+  start             Start recording in the background
+  stop              Stop recording
+  status [--brief]  Show the state and today's active time
+  pause [duration]  Pause (e.g. 30m, 2h; no argument: until resumed)
+  resume            Resume
+  today             Today's active time per process
+  startup on|off    Add / remove the shortcut in the Startup folder
+  open              Open the log folder
+  version           Show the version
 
-出力先（ログ）は既定で exe の隣の logs フォルダ。--dir で変更できる。
-常駐中は、--dir を付けなくても常駐プロセスの出力先を使う。";
+Logs go to the logs folder next to the EXE unless --dir is given.
+While the recorder is running, its folder is used even without --dir.";
 
 fn main() {
     let raw: Vec<String> = std::env::args().skip(1).collect();
@@ -111,7 +111,7 @@ fn dispatch(args: &[&str], explicit_dir: Option<&Path>) -> i32 {
 fn open_dir() -> i32 {
     let dir = common::paths::log_dir();
     if let Err(e) = std::fs::create_dir_all(&dir) {
-        console::err(&format!("ログフォルダを作成できませんでした: {e}"));
+        console::err(&format!("Could not create the log folder: {e}"));
         return 10;
     }
     match std::process::Command::new("explorer.exe").arg(&dir).spawn() {
@@ -120,7 +120,7 @@ fn open_dir() -> i32 {
             0
         }
         Err(e) => {
-            console::err(&format!("エクスプローラーを起動できませんでした: {e}"));
+            console::err(&format!("Could not start Explorer: {e}"));
             10
         }
     }
@@ -134,7 +134,7 @@ fn dispatch(args: &[&str], _explicit_dir: Option<&Path>) -> i32 {
             0
         }
         _ => {
-            console::err("fuashiato は Windows 専用です");
+            console::err("fuashiato runs on Windows only");
             usage_error()
         }
     }

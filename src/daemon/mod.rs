@@ -319,13 +319,13 @@ mod win {
             let mutex = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
             if mutex.is_null() {
                 errlog::log_win32("CreateMutexW");
-                say("Mutexを作成できませんでした");
+                say("Could not create the mutex");
                 return 10;
             }
             if GetLastError() == ERROR_ALREADY_EXISTS {
                 match crate::cli::find_daemon() {
-                    Some((_, pid)) => say(&format!("既に常駐しています（PID {pid}）")),
-                    None => say("既に常駐しています"),
+                    Some((_, pid)) => say(&format!("Already running (PID {pid})")),
+                    None => say("Already running"),
                 }
                 return 2;
             }
@@ -339,7 +339,7 @@ mod win {
                 writer.write_all(&recovery.records);
                 checkpoint::remove();
                 if !detached {
-                    console::err("前回の異常終了を検出し、記録しました");
+                    console::err("The previous run did not stop cleanly; this has been recorded");
                 }
             }
 
@@ -355,7 +355,7 @@ mod win {
             };
             if RegisterClassExW(&wc) == 0 {
                 errlog::log_win32("RegisterClassExW");
-                say("ウィンドウクラスを登録できませんでした");
+                say("Could not register the window class");
                 return 10;
             }
             // CLI が常駐プロセスの出力先を知るため、タイトルに出力先を入れる（GetWindowText は相手が固まっていても読める）
@@ -376,7 +376,7 @@ mod win {
             );
             if hwnd.is_null() {
                 errlog::log_win32("CreateWindowExW");
-                say("ウィンドウを作成できませんでした");
+                say("Could not create the window");
                 return 10;
             }
             MAIN_HWND.store(hwnd, Ordering::SeqCst);
@@ -413,7 +413,7 @@ mod win {
 
             if !detached {
                 SetConsoleCtrlHandler(Some(ctrl_handler), 1);
-                console::err(&format!("記録中です（ログ: {}）。Ctrl+C で停止します。", paths::log_dir().display()));
+                console::err(&format!("Recording (logs: {}). Press Ctrl+C to stop.", paths::log_dir().display()));
             }
 
             let mut msg: MSG = std::mem::zeroed();

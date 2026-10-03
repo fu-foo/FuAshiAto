@@ -99,43 +99,43 @@ pub fn status(brief: bool) -> i32 {
     if brief {
         match (st.pid, pause) {
             (None, _) => {
-                console::out("停止中");
+                console::out("stopped");
                 return 1;
             }
-            (Some(_), None) => console::out(&format!("記録中 {active}")),
-            (Some(_), Some(None)) => console::out(&format!("一時停止中 {active}")),
-            (Some(_), Some(Some(rem))) => console::out(&format!("一時停止中(残り{}) {active}", fmt_remaining(rem))),
+            (Some(_), None) => console::out(&format!("recording {active}")),
+            (Some(_), Some(None)) => console::out(&format!("paused {active}")),
+            (Some(_), Some(Some(rem))) => console::out(&format!("paused({} left) {active}", fmt_remaining(rem))),
         }
         return 0;
     }
 
     let state = match (st.pid, &pause) {
-        (None, _) => "停止中".to_string(),
-        (Some(pid), None) => format!("記録中（PID {pid}）"),
-        (Some(pid), Some(_)) => format!("一時停止中（PID {pid}）"),
+        (None, _) => "Stopped".to_string(),
+        (Some(pid), None) => format!("Recording (PID {pid})"),
+        (Some(pid), Some(_)) => format!("Paused (PID {pid})"),
     };
     let pause_line = match pause {
-        None => "なし".to_string(),
-        Some(None) => "あり（無期限）".to_string(),
-        Some(Some(rem)) => format!("あり（残り{}）", fmt_remaining(rem)),
+        None => "none".to_string(),
+        Some(None) => "yes (until resumed)".to_string(),
+        Some(Some(rem)) => format!("yes ({} left)", fmt_remaining(rem)),
     };
     let abnormal = if st.pid.is_none() && st.cp.is_some() {
         let hb = st.cp.as_ref().map(|c| c.heartbeat.format("%m/%d %H:%M").to_string()).unwrap_or_default();
-        format!("あり（最終heartbeat {hb}。次回起動時に記録されます）")
+        format!("yes (last heartbeat {hb}; it will be recorded on the next start)")
     } else {
         match &st.sum.last_abnormal {
-            None => "なし".to_string(),
+            None => "none".to_string(),
             Some((from, to)) => {
                 let f = |t: &Option<Time>| t.map(|t| t.format("%m/%d %H:%M").to_string()).unwrap_or_else(|| "?".into());
-                format!("あり（{} 〜 {} の記録が欠損）", f(from), f(to))
+                format!("yes (no record from {} to {})", f(from), f(to))
             }
         }
     };
 
-    console::out(&format!("状態        : {state}"));
-    console::out(&format!("今日のactive: {active}"));
-    console::out(&format!("一時停止    : {pause_line}"));
-    console::out(&format!("前回異常終了: {abnormal}"));
+    console::out(&format!("State        : {state}"));
+    console::out(&format!("Active today : {active}"));
+    console::out(&format!("Paused       : {pause_line}"));
+    console::out(&format!("Abnormal exit: {abnormal}"));
     if st.pid.is_some() {
         0
     } else {
@@ -148,15 +148,15 @@ pub fn today() -> i32 {
     let mut rows: Vec<(String, TimeDelta)> = st.sum.per_proc.into_iter().collect();
     rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 
-    console::out(&format!("{} のプロセス別アクティブ時間（{}）", st.now.format("%Y-%m-%d"), paths::hostname()));
+    console::out(&format!("Active time per process, {} ({})", st.now.format("%Y-%m-%d"), paths::hostname()));
     if rows.is_empty() {
-        console::out("  記録がありません");
+        console::out("  No records");
         return 0;
     }
     let total = st.sum.active;
-    let width = rows.iter().map(|(p, _)| p.len().max(6)).max().unwrap_or(6).min(40);
+    let width = rows.iter().map(|(p, _)| p.len().max(9)).max().unwrap_or(9).min(40);
     for (proc, d) in &rows {
-        let name = if proc.is_empty() { "(不明)" } else { proc.as_str() };
+        let name = if proc.is_empty() { "(unknown)" } else { proc.as_str() };
         let pct = if total.num_milliseconds() > 0 {
             d.num_milliseconds() as f64 * 100.0 / total.num_milliseconds() as f64
         } else {
@@ -164,7 +164,7 @@ pub fn today() -> i32 {
         };
         console::out(&format!("  {:<width$}  {:>6}  {:>5.1}%", name, clock::fmt_duration(*d), pct));
     }
-    console::out(&format!("  {:<width$}  {:>6}", "合計", clock::fmt_duration(total), width = width - 2));
+    console::out(&format!("  {:<width$}  {:>6}", "Total", clock::fmt_duration(total)));
     0
 }
 

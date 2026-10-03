@@ -41,7 +41,7 @@ It makes no attempt to hide. The process appears in Task Manager as `fuashiato.e
 
 ### What a window title can give away
 
-A title is often more than an app name: `Q3 layoffs.xlsx - Excel`, the subject of the e-mail you are reading, the title of the web page in a private browser window. All of it lands in the log. Use `fuashiato pause` before doing something you do not want recorded, and treat the log folder as you would any private document.
+A title is often more than an app name: `Client X contract draft.docx - Word`, the subject of the e-mail you are reading, the title of the web page in a private browser window. All of it lands in the log. Use `fuashiato pause` before doing something you do not want recorded, and treat the log folder as you would any private document.
 
 Two ways the log can leave the PC without FuAshiAto sending anything:
 
@@ -89,11 +89,9 @@ fuashiato version
 
 Add `--dir <folder>` to any command to use a different log folder, e.g. `fuashiato start --dir "%LOCALAPPDATA%\FuAshiAto\logs"`. Choose a folder under your own profile: on a shared PC, a folder at the root of a data drive (`D:\...`) is normally readable by the other users. While the recorder is running, the other commands find its folder by themselves.
 
-Command output is currently in Japanese.
-
 Only one recorder runs per session; a second `start` reports the running one and exits with code 2. Exit codes: `0` success, `1` not running, `2` already running, `3` bad arguments, `10` other error.
 
-`status` and `today` read today's log file each time they are called.
+`status` and `today` read today's log file each time they are called, and add the interval that is still open (from `current.json`) up to the present moment. If the recorder is not running but `current.json` is still there, the open interval is counted up to its last update.
 
 ### "Active" does not mean "working", and "idle" does not mean "away"
 
@@ -113,10 +111,10 @@ Everything is in one folder: `logs\` next to the EXE, unless you pass `--dir`.
 | `current.json` | The interval that is still open. Used to detect a crash or power loss on the next start; removed on a clean stop |
 | `fuashiato-error.log` | Errors from the background process |
 
-Logs are never rotated or deleted. A record is roughly 150 to 250 bytes; delete old files yourself when you no longer need them.
+Logs are never rotated or deleted. Delete old files yourself when you no longer need them.
 
 ```json
-{"type":"header","schema":1,"app":"0.1.0","host":"HOGE-PC","user":"hoge","tz":"+09:00"}
+{"type":"header","schema":1,"app":"0.2.0","host":"HOGE-PC","user":"hoge","tz":"+09:00"}
 {"type":"seg","s":"2026-09-28T09:12:03.412+09:00","e":"2026-09-28T09:14:47.090+09:00","st":"active","proc":"hoge.exe","title":"fuga.txt - Hoge Editor"}
 {"type":"seg","s":"2026-09-28T09:14:47.090+09:00","e":"2026-09-28T09:31:10.004+09:00","st":"idle","proc":"","title":""}
 {"type":"event","t":"2026-09-28T10:00:12.003+09:00","ev":"mic_on","app":"HogeMeet_abcdefgh12345"}
@@ -126,9 +124,10 @@ Logs are never rotated or deleted. A record is roughly 150 to 250 bytes; delete 
 
 - `st` is `active`, `idle`, `locked`, `sleep` or `paused`. If several apply, the first of `sleep`, `locked`, `paused`, `idle` wins. Process and title are empty unless it is `active`; a paused interval records only that you paused.
 - An interval is written when it ends. A new one starts whenever the foreground window changes **or its title changes**, so an app that puts a counter or the current tab in its title produces many short intervals. None are dropped or merged; do that when you read the log.
-- `proc` is empty if the process name could not be read, which happens for windows of elevated or protected processes. The title is still recorded. For Store apps, the real process is recorded rather than `ApplicationFrameHost.exe` when it can be found.
-- An idle interval starts at the time of the last input, not when the 60 seconds ran out, so the threshold does not leak into active time.
-- An interval never crosses midnight. At 00:00 local time it is closed at `23:59:59.999` and continued in the next day's file from `00:00:00.000`, so each daily file can be summed on its own.
+- `proc` is empty if the process name could not be read, which happens for windows of protected system processes. The title is still recorded. For Store apps, the real process is recorded rather than `ApplicationFrameHost.exe` when it can be found.
+- An idle interval starts at the time of the last input, not when the 60 seconds ran out, so the threshold does not leak into active time. It ends the same way: at the time of the input that broke it, not when the 5-second check noticed.
+- An interval never crosses midnight. At 00:00 local time it is closed at `23:59:59.999` and continued in the next day's file from `00:00:00.000`, so the intervals of each daily file can be summed on their own. The 1 ms gap is intentional: it keeps both ends of every interval on the date of its file.
+- Every timestamp carries its own UTC offset and is the value to trust. `tz` in the header is only the offset at the moment the file was created, and a day is not always 24 hours where daylight saving time applies.
 
 ### Events (`event`)
 
@@ -140,6 +139,7 @@ Logs are never rotated or deleted. A record is roughly 150 to 250 bytes; delete 
 | `clock_backward` | The system clock was set back | `from`, `to` |
 | `sleep_detected` | Diagnostic only, see below | `method`, `ms` |
 
+- **Microphone.** The time of `mic_on` / `mic_off` is when the 10-second check noticed the change, so it can be up to 10 seconds late. Apps already using the microphone when the recorder starts get a `mic_on` right after `start`. No `mic_off` is written when the recorder stops, and nothing is written at midnight, so a call that runs past midnight has its `mic_on` in one file and its `mic_off` in the next: pair them across files, and treat `stop` as the end of any call still open.
 - **Sleep.** The `sleep` interval is the record to use. Sleep is detected in three ways (a power notification, a jump in the wall clock, and a comparison of two system timers) because none is reliable on every machine. Each method that fires also writes a `sleep_detected` event with its own measurement; these are there to compare the methods and can be ignored when summing time.
 - **Crash or power loss.** `current.json` is rewritten every minute and every time an interval changes. On the next start, the interval that was open is written with its end set to the last rewrite and `"end_unknown":true`, followed by an `abnormal_exit` event. At most about a minute of the open interval is lost.
 
@@ -149,10 +149,10 @@ Logs are never rotated or deleted. A record is roughly 150 to 250 bytes; delete 
 
 ### Reading the log
 
-The records are kept raw on purpose. Classifying and summing them up is left to whatever you read them with. Active hours per process over all days, in PowerShell:
+The records are kept raw on purpose. Classifying and summing them up is left to whatever you read them with. Active hours per process over all days, in PowerShell. Run it in the folder that contains `logs\`, or replace `.\logs` with the folder that `fuashiato open` shows:
 
 ```powershell
-Get-Content .\logs\*.jsonl -Encoding UTF8 | ConvertFrom-Json |
+Get-Content .\logs\*.jsonl -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } |
   Where-Object { $_.type -eq 'seg' -and $_.st -eq 'active' } |
   Group-Object proc |
   ForEach-Object {
