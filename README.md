@@ -187,12 +187,7 @@ cargo build --release
 cargo test
 ```
 
-Rust 1.86 or later. Cross-compiling from macOS or Linux works with [`cargo-xwin`](https://github.com/rust-cross/cargo-xwin):
-
-```
-rustup target add x86_64-pc-windows-msvc
-cargo xwin build --release --target x86_64-pc-windows-msvc
-```
+Build on Windows with Rust 1.86 or later.
 
 ## Support
 
